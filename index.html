@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lightsaber Gyro</title>
+<style>
+  body { 
+    background: #111; color: white; text-align: center; 
+    font-family: sans-serif; overflow: hidden; margin: 0; padding: 50px 0; 
+  }
+  #start-btn { 
+    padding: 20px 40px; font-size: 20px; background: #2ecc71; 
+    color: white; border: none; border-radius: 10px; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+  }
+  #saber { display: none; margin-top: 50px; }
+  .blade { 
+    width: 24px; height: 350px; background: #fff; margin: 0 auto; 
+    box-shadow: 0 0 20px #2ecc71, 0 0 40px #2ecc71, 0 0 60px #2ecc71; 
+    border-radius: 12px 12px 0 0; transition: height 0.3s; 
+  }
+  .hilt { 
+    width: 34px; height: 120px; background: linear-gradient(to right, #666, #999, #666); 
+    margin: 0 auto; border-radius: 0 0 5px 5px; border-top: 5px solid #333;
+  }
+</style>
+</head>
+<body>
+
+<button id="start-btn">กดเพื่อเปิด Lightsaber<br><small>(อนุญาตเสียงและเซ็นเซอร์)</small></button>
+
+<div id="saber">
+  <div class="blade"></div>
+  <div class="hilt"></div>
+</div>
+
+<script>
+let audioCtx, oscillator, gainNode;
+let isPlaying = false;
+
+document.getElementById('start-btn').addEventListener('click', async () => {
+    // 1. ขออนุญาตเข้าถึง Sensor (จำเป็นสำหรับ iOS)
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission !== 'granted') {
+                alert('ต้องอนุญาตเซ็นเซอร์ถึงจะเล่นได้ครับ');
+                return;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // 2. สร้างเสียง Lightsaber ด้วย Web Audio API
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        oscillator = audioCtx.createOscillator();
+        gainNode = audioCtx.createGain();
+        
+        // ตั้งค่าเสียงหึ่งๆ พื้นฐาน (Hum)
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = 55; // ความถี่ต่ำ
+        gainNode.gain.value = 0.4;
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+    }
+
+    // ปลุก Audio Context ถ้ามันหลับอยู่ (ป้องกัน Browser Block)
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('saber').style.display = 'block';
+    isPlaying = true;
+
+    // 3. จับการแกว่งมือถือ (Device Motion)
+    window.addEventListener('devicemotion', (event) => {
+        if (!isPlaying || !event.accelerationIncludingGravity) return;
+        
+        let acc = event.acceleration || event.accelerationIncludingGravity;
+        // คำนวณแรงเหวี่ยงรวม
+        let force = Math.abs(acc.x || 0) + Math.abs(acc.y || 0) + Math.abs(acc.z || 0);
+        
+        // ถ้ามีการแกว่งแรงพอสมควร
+        if (force > 15) {
+            // ปรับเสียงให้แหลมและดังขึ้นตามแรงเหวี่ยง (Swing sound)
+            let newFreq = 55 + (force * 4);
+            if (newFreq > 300) newFreq = 300; // Limit เสียงไม่ให้แหลมไป
+            
+            oscillator.frequency.setTargetAtTime(newFreq, audioCtx.currentTime, 0.05);
+            gainNode.gain.setTargetAtTime(0.8, audioCtx.currentTime, 0.05);
+        } else {
+            // กลับมาเป็นเสียงหึ่งๆ ตอนถือค้างไว้เฉยๆ
+            oscillator.frequency.setTargetAtTime(55, audioCtx.currentTime, 0.3);
+            gainNode.gain.setTargetAtTime(0.4, audioCtx.currentTime, 0.3);
+        }
+    });
+});
+</script>
+</body>
+</html>
