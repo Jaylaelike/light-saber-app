@@ -2,104 +2,368 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lightsaber Gyro</title>
 <style>
-  body { 
-    background: #111; color: white; text-align: center; 
-    font-family: sans-serif; overflow: hidden; margin: 0; padding: 50px 0; 
+  :root {
+    --blade: #2ecc71;
+    --blade-glow: 46, 204, 113;
+    --bg: #0b0d10;
+    --metal-1: #4a4f57;
+    --metal-2: #9aa1ab;
+    --metal-3: #3a3e45;
+    --blade-h: min(52vh, 380px);
   }
-  #start-btn { 
-    padding: 20px 40px; font-size: 20px; background: #2ecc71; 
-    color: white; border: none; border-radius: 10px; cursor: pointer;
-    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: #e8ebef;
+    font-family: system-ui, -apple-system, "Noto Sans Thai", sans-serif;
+    overflow: hidden; touch-action: manipulation; user-select: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 28px);
+    position: relative;
   }
-  #saber { display: none; margin-top: 50px; }
-  .blade { 
-    width: 24px; height: 350px; background: #fff; margin: 0 auto; 
-    box-shadow: 0 0 20px #2ecc71, 0 0 40px #2ecc71, 0 0 60px #2ecc71; 
-    border-radius: 12px 12px 0 0; transition: height 0.3s; 
+  /* room light that follows the blade */
+  body::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 60% 55% at 50% 55%, rgba(var(--blade-glow), .22), transparent 70%);
+    opacity: 0; transition: opacity .5s ease;
   }
-  .hilt { 
-    width: 34px; height: 120px; background: linear-gradient(to right, #666, #999, #666); 
-    margin: 0 auto; border-radius: 0 0 5px 5px; border-top: 5px solid #333;
+  body.on::before { opacity: 1; }
+
+  .saber { position: relative; display: flex; flex-direction: column; align-items: center; }
+
+  .blade-wrap { height: var(--blade-h); width: 26px; display: flex; align-items: flex-end; }
+  .blade {
+    width: 100%; height: 100%; background: #fff; border-radius: 13px 13px 0 0;
+    transform-origin: bottom center; transform: scaleY(0);
+    box-shadow: 0 0 14px 2px var(--blade), 0 0 40px 10px rgba(var(--blade-glow), .6), 0 0 90px 24px rgba(var(--blade-glow), .35);
+    transition: transform .55s cubic-bezier(.2, .8, .2, 1);
+    will-change: transform;
+  }
+  body.on .blade { transform: scaleY(1); }
+  body.off-anim .blade { transition-duration: .4s; transition-timing-function: cubic-bezier(.6, 0, .8, .3); }
+
+  .emitter {
+    width: 40px; height: 14px; border-radius: 4px 4px 0 0;
+    background: linear-gradient(to right, var(--metal-3), var(--metal-2), var(--metal-3));
+    border-bottom: 3px solid #1c1f24;
+  }
+  .hilt {
+    position: relative; width: 36px; height: 150px; border-radius: 0 0 8px 8px;
+    background:
+      repeating-linear-gradient(to bottom, transparent 0 14px, rgba(0,0,0,.35) 14px 16px),
+      linear-gradient(to right, var(--metal-3), var(--metal-2) 45%, var(--metal-3));
+    display: flex; flex-direction: column; align-items: center; padding-top: 22px;
+  }
+
+  /* The power switch */
+  .switch {
+    position: relative; width: 64px; height: 64px; margin-top: -2px; border-radius: 50%;
+    border: 0; padding: 0; cursor: pointer; color: inherit;
+    background: radial-gradient(circle at 35% 30%, #5b616b, #23262b 70%);
+    box-shadow: 0 6px 14px rgba(0,0,0,.6), inset 0 1px 1px rgba(255,255,255,.25), 0 0 0 4px #15171b;
+    display: grid; place-items: center;
+    transition: transform .12s ease, box-shadow .3s ease;
+  }
+  .switch:active { transform: scale(.93); }
+  .switch:focus-visible { outline: 3px solid #fff; outline-offset: 6px; }
+  .switch .ring {
+    position: absolute; inset: 7px; border-radius: 50%;
+    border: 2px solid #4b515a; transition: border-color .3s, box-shadow .3s;
+  }
+  .switch svg { width: 26px; height: 26px; stroke: #6d747e; fill: none; stroke-width: 2.4; stroke-linecap: round; transition: stroke .3s, filter .3s; }
+  body.on .switch .ring { border-color: var(--blade); box-shadow: 0 0 12px rgba(var(--blade-glow), .8), inset 0 0 8px rgba(var(--blade-glow), .5); }
+  body.on .switch svg { stroke: var(--blade); filter: drop-shadow(0 0 5px var(--blade)); }
+  body.on .switch { box-shadow: 0 6px 14px rgba(0,0,0,.6), inset 0 1px 1px rgba(255,255,255,.25), 0 0 0 4px #15171b, 0 0 26px rgba(var(--blade-glow), .45); }
+  body.idle .switch { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 6px 14px rgba(0,0,0,.6), inset 0 1px 1px rgba(255,255,255,.25), 0 0 0 4px #15171b, 0 0 0 4px rgba(255,255,255,0); }
+    50% { box-shadow: 0 6px 14px rgba(0,0,0,.6), inset 0 1px 1px rgba(255,255,255,.25), 0 0 0 4px #15171b, 0 0 0 12px rgba(255,255,255,.12); }
+  }
+
+  .pommel { width: 30px; height: 10px; background: #2a2d33; border-radius: 0 0 8px 8px; }
+
+  .status { margin-top: 22px; min-height: 2.6em; text-align: center; font-size: 15px; line-height: 1.4; color: #9aa1ab; padding: 0 24px; }
+  .status b { color: #e8ebef; font-weight: 600; }
+
+  .swatches { display: flex; gap: 14px; margin-top: 14px; }
+  .swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; padding: 0; cursor: pointer; }
+  .swatch[aria-checked="true"] { border-color: #fff; box-shadow: 0 0 10px currentColor; }
+  .swatch:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.idle .switch { animation: none; }
+    .blade, body::before { transition-duration: .01s !important; }
   }
 </style>
 </head>
-<body>
+<body class="idle">
 
-<button id="start-btn">กดเพื่อเปิด Lightsaber<br><small>(อนุญาตเสียงและเซ็นเซอร์)</small></button>
+<main class="saber">
+  <div class="blade-wrap"><div class="blade"></div></div>
+  <div class="emitter"></div>
+  <div class="hilt">
+    <button class="switch" id="power" type="button" role="switch" aria-checked="false" aria-label="เปิด/ปิด Lightsaber">
+      <span class="ring"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+    </button>
+  </div>
+  <div class="pommel"></div>
+</main>
 
-<div id="saber">
-  <div class="blade"></div>
-  <div class="hilt"></div>
+<div class="status" id="status" aria-live="polite">แตะปุ่มที่ด้ามเพื่อ<b>จุดดาบ</b></div>
+
+<div class="swatches" id="swatches" role="radiogroup" aria-label="สีใบดาบ">
+  <button class="swatch" role="radio" aria-checked="true"  aria-label="เขียว" data-rgb="46,204,113" style="background:#2ecc71;color:#2ecc71"></button>
+  <button class="swatch" role="radio" aria-checked="false" aria-label="ฟ้า"   data-rgb="52,152,255" style="background:#3498ff;color:#3498ff"></button>
+  <button class="swatch" role="radio" aria-checked="false" aria-label="แดง"   data-rgb="255,59,59"  style="background:#ff3b3b;color:#ff3b3b"></button>
+  <button class="swatch" role="radio" aria-checked="false" aria-label="ม่วง"  data-rgb="178,102,255" style="background:#b266ff;color:#b266ff"></button>
 </div>
 
 <script>
-let audioCtx, oscillator, gainNode;
-let isPlaying = false;
+const body = document.body;
+const power = document.getElementById('power');
+const statusEl = document.getElementById('status');
 
-document.getElementById('start-btn').addEventListener('click', async () => {
-    // 1. ขออนุญาตเข้าถึง Sensor (จำเป็นสำหรับ iOS)
-    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-            const permission = await DeviceMotionEvent.requestPermission();
-            if (permission !== 'granted') {
-                alert('ต้องอนุญาตเซ็นเซอร์ถึงจะเล่นได้ครับ');
-                return;
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    }
+let isOn = false;
+let sensorReady = false;
+let sensorState = 'unknown'; // unknown | granted | denied | none
 
-    // 2. สร้างเสียง Lightsaber ด้วย Web Audio API
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        oscillator = audioCtx.createOscillator();
-        gainNode = audioCtx.createGain();
-        
-        // ตั้งค่าเสียงหึ่งๆ พื้นฐาน (Hum)
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.value = 55; // ความถี่ต่ำ
-        gainNode.gain.value = 0.4;
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.start();
-    }
+const vibrate = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
-    // ปลุก Audio Context ถ้ามันหลับอยู่ (ป้องกัน Browser Block)
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+function setStatus(html) { statusEl.innerHTML = html; }
 
-    document.getElementById('start-btn').style.display = 'none';
-    document.getElementById('saber').style.display = 'block';
-    isPlaying = true;
+/* ---------- Audio (layered synth) ---------- */
+const BASE = 82;            // hum pitch (Hz)
+let audioCtx, master, hum, humFilter, noiseBuf, whoosh, whooshGain, whooshFilter, lfo, osc = [];
+let swing = 0, swingTarget = 0, lastClash = 0, lastForce = 0, raf = 0;
 
-    // 3. จับการแกว่งมือถือ (Device Motion)
-    window.addEventListener('devicemotion', (event) => {
-        if (!isPlaying || !event.accelerationIncludingGravity) return;
-        
-        let acc = event.acceleration || event.accelerationIncludingGravity;
-        // คำนวณแรงเหวี่ยงรวม
-        let force = Math.abs(acc.x || 0) + Math.abs(acc.y || 0) + Math.abs(acc.z || 0);
-        
-        // ถ้ามีการแกว่งแรงพอสมควร
-        if (force > 15) {
-            // ปรับเสียงให้แหลมและดังขึ้นตามแรงเหวี่ยง (Swing sound)
-            let newFreq = 55 + (force * 4);
-            if (newFreq > 300) newFreq = 300; // Limit เสียงไม่ให้แหลมไป
-            
-            oscillator.frequency.setTargetAtTime(newFreq, audioCtx.currentTime, 0.05);
-            gainNode.gain.setTargetAtTime(0.8, audioCtx.currentTime, 0.05);
-        } else {
-            // กลับมาเป็นเสียงหึ่งๆ ตอนถือค้างไว้เฉยๆ
-            oscillator.frequency.setTargetAtTime(55, audioCtx.currentTime, 0.3);
-            gainNode.gain.setTargetAtTime(0.4, audioCtx.currentTime, 0.3);
-        }
-    });
+function makeNoise(ctx) {
+  const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+function makeImpulse(ctx, secs = 0.7, decay = 3) {
+  const len = ctx.sampleRate * secs, b = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = b.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return b;
+}
+function makeDrive(amount = 6) {
+  const n = 1024, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * amount) / Math.tanh(amount); }
+  return curve;
+}
+
+function initAudio() {
+  if (audioCtx) return;
+  const ctx = audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  noiseBuf = makeNoise(ctx);
+
+  // output chain: master -> compressor -> destination (+ small room reverb)
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -18; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.2;
+  master = ctx.createGain(); master.gain.value = 0;
+  const verb = ctx.createConvolver(); verb.buffer = makeImpulse(ctx);
+  const wet = ctx.createGain(); wet.gain.value = 0.18;
+  master.connect(comp); master.connect(verb); verb.connect(wet); wet.connect(comp);
+  comp.connect(ctx.destination);
+
+  // hum: 2 detuned saws (beating) + square an octave down + soft sine on top
+  hum = ctx.createGain(); hum.gain.value = 0.5;
+  const drive = ctx.createWaveShaper(); drive.curve = makeDrive(4); drive.oversample = '2x';
+  humFilter = ctx.createBiquadFilter(); humFilter.type = 'lowpass'; humFilter.frequency.value = 1100; humFilter.Q.value = 1.2;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 45;
+  [['sawtooth', 1, 0, .30], ['sawtooth', 1.008, 0, .30], ['square', .5, 0, .22], ['sine', 2, 0, .10]].forEach(([type, mul, , g]) => {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.value = BASE * mul; o._mul = mul;
+    const og = ctx.createGain(); og.gain.value = g;
+    o.connect(og); og.connect(drive); o.start(); osc.push(o);
+  });
+  drive.connect(humFilter); humFilter.connect(hp); hp.connect(hum); hum.connect(master);
+
+  // slow warble: LFO -> hum volume and pitch (the "living" flutter)
+  lfo = ctx.createOscillator(); lfo.frequency.value = 5.5;
+  const lfoVol = ctx.createGain(); lfoVol.gain.value = 0.07;
+  const lfoPitch = ctx.createGain(); lfoPitch.gain.value = 1.6;
+  lfo.connect(lfoVol); lfoVol.connect(hum.gain);
+  lfo.connect(lfoPitch); osc.forEach(o => lfoPitch.connect(o.detune));
+  lfo.start();
+
+  // swing whoosh: looped noise through a moving band-pass
+  whoosh = ctx.createBufferSource(); whoosh.buffer = noiseBuf; whoosh.loop = true;
+  whooshFilter = ctx.createBiquadFilter(); whooshFilter.type = 'bandpass'; whooshFilter.frequency.value = 500; whooshFilter.Q.value = 1.4;
+  whooshGain = ctx.createGain(); whooshGain.gain.value = 0;
+  whoosh.connect(whooshFilter); whooshFilter.connect(whooshGain); whooshGain.connect(master);
+  whoosh.start();
+}
+
+function setPitch(mul, tc = 0.04) {
+  const t = audioCtx.currentTime;
+  osc.forEach(o => o.frequency.setTargetAtTime(BASE * o._mul * mul, t, tc));
+}
+
+// one-shot noise burst (crackle / snap)
+function burst(dur, f0, f1, vol, type = 'bandpass', q = 1) {
+  const ctx = audioCtx, t = ctx.currentTime;
+  const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q;
+  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random()); s.stop(t + dur + 0.05);
+}
+// low thump
+function thump(f0, f1, dur, vol) {
+  const ctx = audioCtx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+}
+
+function soundIgnite() {
+  const t = audioCtx.currentTime;
+  // pitch rises as the blade extends, filter opens with it
+  osc.forEach(o => { o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(BASE * o._mul * 0.35, t); o.frequency.exponentialRampToValueAtTime(BASE * o._mul, t + 0.6); });
+  humFilter.frequency.cancelScheduledValues(t);
+  humFilter.frequency.setValueAtTime(180, t); humFilter.frequency.exponentialRampToValueAtTime(1100, t + 0.6);
+  master.gain.cancelScheduledValues(t);
+  master.gain.setValueAtTime(0.0001, t); master.gain.exponentialRampToValueAtTime(0.9, t + 0.12);
+  burst(0.5, 400, 4200, 0.5, 'bandpass', 0.8);   // "sssshk" ignition sizzle
+  burst(0.08, 3000, 3000, 0.4, 'highpass');         // initial strike
+  thump(110, 38, 0.35, 0.7);                        // power-up thud
+}
+
+function soundRetract() {
+  const t = audioCtx.currentTime;
+  osc.forEach(o => { o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(o.frequency.value, t); o.frequency.exponentialRampToValueAtTime(BASE * o._mul * 0.3, t + 0.4); });
+  humFilter.frequency.cancelScheduledValues(t);
+  humFilter.frequency.setValueAtTime(humFilter.frequency.value, t); humFilter.frequency.exponentialRampToValueAtTime(150, t + 0.4);
+  whooshGain.gain.setTargetAtTime(0, t, 0.05);
+  master.gain.cancelScheduledValues(t);
+  master.gain.setValueAtTime(master.gain.value, t); master.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+  master.gain.setValueAtTime(0, t + 0.45);
+  burst(0.35, 3200, 300, 0.35, 'bandpass', 0.8);
+  thump(90, 30, 0.25, 0.5);
+}
+
+function soundClash() {
+  const now = performance.now();
+  if (now - lastClash < 350) return;
+  lastClash = now;
+  burst(0.22, 5000, 900, 0.9, 'bandpass', 0.7);   // metallic crackle
+  burst(0.06, 2500, 2500, 0.8, 'highpass');
+  thump(160, 50, 0.18, 0.8);
+  const t = audioCtx.currentTime;
+  humFilter.frequency.setTargetAtTime(2600, t, 0.01); humFilter.frequency.setTargetAtTime(1100, t + 0.08, 0.15);
+  vibrate([40, 30, 40]);
+}
+
+/* Continuous update: swing drives pitch (doppler feel), brightness and whoosh */
+function tick() {
+  raf = requestAnimationFrame(tick);
+  if (!isOn || !audioCtx) return;
+  swing = Math.max(swingTarget, swing * 0.93);   // fast attack, smooth release
+  swingTarget *= 0.5;
+  const s = Math.min(swing, 1), t = audioCtx.currentTime;
+  setPitch(1 + s * 0.45, 0.05);
+  humFilter.frequency.setTargetAtTime(1100 + s * 1500, t, 0.05);
+  hum.gain.setTargetAtTime(0.5 + s * 0.35, t, 0.05);
+  whooshGain.gain.setTargetAtTime(s * s * 0.9, t, 0.04);
+  whooshFilter.frequency.setTargetAtTime(350 + s * 2200, t, 0.04);
+}
+
+/* ---------- Motion sensor ---------- */
+function onMotion(e) {
+  if (!isOn || !audioCtx) return;
+  let force = 0;
+  const a = e.acceleration;
+  if (a && (a.x != null)) force = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
+  else if (e.accelerationIncludingGravity) { const g = e.accelerationIncludingGravity; force = Math.abs(Math.hypot(g.x || 0, g.y || 0, g.z || 0) - 9.8); }
+  const r = e.rotationRate, rot = r ? Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0) : 0;
+  const level = Math.max(force / 22, rot / 450);
+  if (level > 0.12) swingTarget = Math.max(swingTarget, Math.min(level, 1));
+  // sudden jolt after a swing = clash
+  if (force - lastForce > 28) soundClash();
+  lastForce = force;
+}
+
+async function ensureSensor() {
+  if (sensorReady) return;
+  if (typeof DeviceMotionEvent === 'undefined') { sensorState = 'none'; return; }
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    try { sensorState = (await DeviceMotionEvent.requestPermission()) === 'granted' ? 'granted' : 'denied'; }
+    catch (e) { sensorState = 'denied'; }
+  } else sensorState = 'granted';
+  if (sensorState === 'granted') { window.addEventListener('devicemotion', onMotion); sensorReady = true; }
+}
+
+/* Desktop / no-sensor fallback: drag or move the pointer to swing */
+let px = 0, py = 0, pt = 0;
+window.addEventListener('pointermove', (e) => {
+  if (!isOn || !audioCtx) return;
+  const now = performance.now(), dt = Math.max(now - pt, 8);
+  const v = Math.hypot(e.clientX - px, e.clientY - py) / dt; // px per ms
+  px = e.clientX; py = e.clientY; pt = now;
+  if (sensorState !== 'granted') swingTarget = Math.max(swingTarget, Math.min(v / 2.5, 1));
+});
+window.addEventListener('pointerdown', (e) => {
+  if (isOn && sensorState !== 'granted' && !e.target.closest('button')) soundClash();
+});
+
+/* ---------- Switch ---------- */
+let busy = false;
+async function toggle() {
+  if (busy) return;
+  busy = true;
+  body.classList.remove('idle');
+
+  if (!isOn) {
+    initAudio();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    await ensureSensor();
+    isOn = true;
+    body.classList.remove('off-anim');
+    body.classList.add('on');
+    power.setAttribute('aria-checked', 'true');
+    soundIgnite();
+    cancelAnimationFrame(raf); tick();
+    vibrate([30, 40, 60]);
+    if (sensorState === 'granted') setStatus('<b>ดาบพร้อมแล้ว</b> แกว่งมือถือให้เสียงตอบสนอง กระแทกเพื่อให้เสียงปะทะ');
+    else if (sensorState === 'denied') setStatus('<b>ไม่ได้รับสิทธิ์เซ็นเซอร์</b> เสียงหึ่งยังทำงาน แต่ไม่ตอบสนองการแกว่ง<br>เปิดสิทธิ์ใน Settings แล้วลองใหม่');
+    else setStatus('<b>ดาบพร้อมแล้ว</b> ลากเมาส์เพื่อแกว่ง คลิกเพื่อปะทะ');
+  } else {
+    isOn = false;
+    body.classList.add('off-anim');
+    body.classList.remove('on');
+    power.setAttribute('aria-checked', 'false');
+    if (audioCtx) soundRetract();
+    cancelAnimationFrame(raf); swing = swingTarget = 0;
+    vibrate(40);
+    setStatus('แตะปุ่มที่ด้ามเพื่อ<b>จุดดาบ</b>');
+  }
+  setTimeout(() => { busy = false; }, 450);
+}
+
+power.addEventListener('click', toggle);
+
+/* ---------- Colour picker ---------- */
+document.getElementById('swatches').addEventListener('click', (e) => {
+  const s = e.target.closest('.swatch');
+  if (!s) return;
+  document.querySelectorAll('.swatch').forEach(x => x.setAttribute('aria-checked', x === s ? 'true' : 'false'));
+  const rgb = s.dataset.rgb;
+  document.documentElement.style.setProperty('--blade-glow', rgb);
+  document.documentElement.style.setProperty('--blade', `rgb(${rgb})`);
+  vibrate(10);
+});
+
+/* Turn the blade off if the page is hidden, so audio never keeps humming */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && isOn) toggle();
 });
 </script>
 </body>
